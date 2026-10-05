@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Cube Hop</title>
+
+  <style>
+    html,
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: black;
+    }
+
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="game"></canvas>
+
+  <script>
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+
+    let width;
+    let height;
+    let groundY;
+
+    function resizeCanvas() {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+
+      groundY = height * 0.82;
+    }
+
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
+
+
+    // input
+
+    const keys = {};
+
+    window.addEventListener("keydown", (event) => {
+      keys[event.key] = true;
+    });
+
+    window.addEventListener("keyup", (event) => {
+      keys[event.key] = false;
+    });
+
+    window.addEventListener("pointerdown", () => {
+      keys[" "] = true;
+    });
+
+    window.addEventListener("pointerup", () => {
+      keys[" "] = false;
+    });
+
+    function jumpPressed() {
+      return keys[" "] || keys["ArrowUp"] || keys["w"];
+    }
+
+
+    // player
+
+    const player = {
+      x: 0,
+      y: 0,
+      velocityY: 0,
+      size: 24,
+      inAir: false
+    };
+
+
+    // game state
+
+    let spikes = [];
+
+    let distance = 0;
+    let bestDistance = 0;
+    let attempts = 1;
+
+    let deathTimer = 0;
+    let gameStarted = false;
+
+
+    function createSpike(x) {
+      return {
+        x,
+        width: 30
+      };
+    }
+
+    function resetGame() {
+      spikes = [];
+
+      player.y = 0;
+      player.velocityY = 0;
+      player.inAir = false;
+
+      distance = 0;
+      deathTimer = 0;
+
+      for (let i = 0; i < 5; i++) {
+        const x = width + 500 + i * 350;
+        spikes.push(createSpike(x));
+      }
+    }
+
+    resetGame();
+
+
+    function updatePlayer() {
+      if (jumpPressed() && !player.inAir) {
+        player.velocityY = -13.5;
+        player.inAir = true;
+      }
+
+      player.y += player.velocityY;
+      player.velocityY += 0.85;
+
+      // floor collision
+      if (player.y >= 0) {
+        player.y = 0;
+        player.velocityY = 0;
+        player.inAir = false;
+      }
+    }
+
+    function updateSpikes(speed) {
+      for (const spike of spikes) {
+        spike.x -= speed;
+      }
+
+      spikes = spikes.filter((spike) => spike.x > -80);
+
+      const lastSpikeX = spikes.length
+        ? spikes[spikes.length - 1].x
+        : width;
+
+      if (lastSpikeX < width + 400) {
+        const gap = 300 + Math.random() * 250;
+        spikes.push(createSpike(lastSpikeX + gap));
+      }
+    }
+
+    function checkCollision() {
+      const playerX = width * 0.3;
+      const playerY = groundY - player.size + player.y;
+
+      for (const spike of spikes) {
+        const overlapsX =
+          playerX + 20 > spike.x + 6 &&
+          playerX + 4 < spike.x + spike.width - 6;
+
+        const overlapsY =
+          playerY + player.size > groundY - 30;
+
+        if (overlapsX && overlapsY) {
+          bestDistance = Math.max(bestDistance, distance);
+          deathTimer = 40;
+          return;
+        }
+      }
+    }
+
+
+    function updateGame() {
+      const speed = Math.min(6 + distance / 900, 10);
+
+      if (!gameStarted) {
+        if (jumpPressed()) {
+          gameStarted = true;
+        }
+
+        return;
+      }
+
+      if (deathTimer > 0) {
+        deathTimer--;
+
+        if (deathTimer === 1) {
+          attempts++;
+          resetGame();
+        }
+
+        return;
+      }
+
+      distance += speed;
+
+      updatePlayer();
+      updateSpikes(speed);
+      checkCollision();
+    }
+
+
+    function drawBackground() {
+      ctx.fillStyle = "#00aaff";
+      ctx.fillRect(0, 0, width, groundY);
+
+      ctx.fillStyle = "#000";
+      ctx.fillRect(0, groundY, width, height - groundY);
+
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, groundY - 2, width, 2);
+    }
+
+    function drawSpikes() {
+      ctx.fillStyle = "#fff";
+
+      for (const spike of spikes) {
+        ctx.beginPath();
+
+        ctx.moveTo(spike.x, groundY);
+        ctx.lineTo(spike.x + spike.width / 2, groundY - 34);
+        ctx.lineTo(spike.x + spike.width, groundY);
+
+        ctx.fill();
+      }
+    }
+
+    function drawPlayer() {
+      if (!gameStarted) {
+        return;
+      }
+
+      const x = width * 0.3;
+      const y = groundY - player.size + player.y;
+
+      ctx.fillStyle = deathTimer ? "#ff5555" : "#fff";
+      ctx.fillRect(x, y, player.size, player.size);
+    }
+
+    function drawStartText() {
+      if (gameStarted) {
+        return;
+      }
+
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 24px monospace";
+      ctx.textAlign = "center";
+
+      ctx.fillText("TAP TO PLAY", width / 2, height / 2);
+    }
+
+    function drawStats() {
+      const currentMeters = Math.floor(distance / 50);
+      const bestMeters = Math.floor(bestDistance / 50);
+
+      ctx.fillStyle = "#fff";
+      ctx.font = "16px monospace";
+      ctx.textAlign = "left";
+
+      ctx.fillText(
+        `${currentMeters}m  BEST ${bestMeters}m  ATTEMPT ${attempts}`,
+        12,
+        24
+      );
+    }
+
+
+    function draw() {
+      drawBackground();
+      drawSpikes();
+      drawPlayer();
+      drawStartText();
+      drawStats();
+    }
+
+
+    function gameLoop() {
+      updateGame();
+      draw();
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    gameLoop();
+  </script>
+</body>
+</html>
