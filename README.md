@@ -3,7 +3,8 @@
 A lightweight browser-based arcade jumper built with pure HTML5 Canvas and vanilla JavaScript, packaged as a single standalone URI string.
 
 ## how to use it
-
+put this uri on your browser
+https://github.com/yupskew/cubehop/blob/main/uri.txt
 
 
 
